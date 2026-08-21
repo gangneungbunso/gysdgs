@@ -185,6 +185,11 @@
   .comment-item .who time{font-weight:400; color:var(--ink-soft); font-size:11px;}
   .comment-item p{margin:6px 0 0; font-size:13.5px; line-height:1.6;}
   .comment-empty{font-size:13px; color:var(--ink-soft); padding:14px 0;}
+  .c-actions{display:flex; gap:10px; margin-top:8px;}
+  .c-act-btn{background:none; border:none; padding:0; font-size:11.5px; color:var(--ink-soft); text-decoration:underline; cursor:pointer;}
+  .c-act-btn:hover{color:var(--pine-dark);}
+  .c-act-btn.c-admin{opacity:0.5;}
+  .c-act-btn.c-admin:hover{opacity:1; color:var(--coral);}
 
   @media (max-width:900px){.map-layout{grid-template-columns:1fr;}}
 
@@ -1014,7 +1019,7 @@ async function selectPlace(id){
   placeDetail.classList.add('show');
   placeDetail.scrollIntoView({behavior:'smooth', block:'nearest'});
 
-  renderComments(data.comments);
+  renderComments(id, data.comments);
 
   document.getElementById('likeBtn').addEventListener('click', ()=>toggleLike(id));
   document.getElementById('commentSubmit').addEventListener('click', ()=>submitComment(id));
@@ -1026,19 +1031,95 @@ async function selectPlace(id){
   });
 }
 
-function renderComments(comments){
+function getOwnedComments(){
+  try{ return JSON.parse(localStorage.getItem('myComments') || '[]'); }catch(e){ return []; }
+}
+function saveOwnedComment(id){
+  try{
+    const owned = getOwnedComments();
+    owned.push(id);
+    localStorage.setItem('myComments', JSON.stringify(owned));
+  }catch(e){}
+}
+function isOwnedComment(id){ return getOwnedComments().includes(id); }
+
+function renderComments(placeId, comments){
   const list = document.getElementById('commentList');
   if(!list) return;
   if(!comments || comments.length===0){
     list.innerHTML = `<div class="comment-empty">아직 댓글이 없어요. 첫 실천을 남겨보세요!</div>`;
     return;
   }
-  list.innerHTML = comments.slice().reverse().map(c=>`
+  list.innerHTML = comments.slice().reverse().map(c=>{
+    const canModerate = !!c.id;
+    const owner = canModerate && isOwnedComment(c.id);
+    return `
     <div class="comment-item">
       <div class="who"><span>${escapeHtml(c.name || '강릉 지킴이')}</span><time>${c.date}</time></div>
       <p>${escapeHtml(c.text)}</p>
+      ${canModerate ? `
+      <div class="c-actions">
+        ${owner
+          ? `<button class="c-act-btn" data-act="edit" data-cid="${c.id}">✏️ 수정</button><button class="c-act-btn" data-act="delete-own" data-cid="${c.id}">🗑️ 삭제</button>`
+          : `<button class="c-act-btn c-admin" data-act="delete-admin" data-cid="${c.id}">🔒 신고/삭제</button>`}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.c-act-btn').forEach(btn=>{
+    const cid = btn.dataset.cid;
+    if(btn.dataset.act === 'edit'){
+      btn.addEventListener('click', ()=>startEditComment(placeId, cid));
+    } else if(btn.dataset.act === 'delete-own'){
+      btn.addEventListener('click', ()=>confirmDeleteComment(placeId, cid));
+    } else {
+      btn.addEventListener('click', ()=>requireTeamAccess(()=>confirmDeleteComment(placeId, cid)));
+    }
+  });
+}
+
+function startEditComment(placeId, commentId){
+  const comment = (placeState[placeId].comments||[]).find(c=>c.id===commentId);
+  if(!comment) return;
+  modalCard.innerHTML = `
+    <button class="modal-close" id="modalCloseBtn">✕</button>
+    <span class="ic-big">✏️</span>
+    <h3>댓글 수정하기</h3>
+    <textarea id="editCommentText" maxlength="140" style="min-height:90px;">${escapeHtml(comment.text)}</textarea>
+    <div class="submit-row"><button class="btn btn-primary btn-small" id="editCommentSubmit">저장</button></div>
+  `;
+  modalBackdrop.classList.add('show');
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  document.getElementById('editCommentSubmit').addEventListener('click', async ()=>{
+    const newText = document.getElementById('editCommentText').value.trim();
+    if(!newText) return;
+    comment.text = newText;
+    renderComments(placeId, placeState[placeId].comments);
+    closeModal();
+    await apiPost({ action:'editComment', placeId, id:commentId, text:newText });
+  });
+}
+
+function confirmDeleteComment(placeId, commentId){
+  modalCard.innerHTML = `
+    <button class="modal-close" id="modalCloseBtn">✕</button>
+    <span class="ic-big">🗑️</span>
+    <h3>이 댓글을 삭제할까요?</h3>
+    <p>삭제하면 되돌릴 수 없어요.</p>
+    <div class="submit-row" style="gap:8px;">
+      <button class="btn btn-ghost btn-small" id="cDelCancel">취소</button>
+      <button class="btn btn-primary btn-small" id="cDelConfirm" style="background:var(--coral);">삭제하기</button>
     </div>
-  `).join('');
+  `;
+  modalBackdrop.classList.add('show');
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  document.getElementById('cDelCancel').addEventListener('click', closeModal);
+  document.getElementById('cDelConfirm').addEventListener('click', async ()=>{
+    placeState[placeId].comments = (placeState[placeId].comments||[]).filter(c=>c.id!==commentId);
+    renderComments(placeId, placeState[placeId].comments);
+    closeModal();
+    await apiPost({ action:'deleteComment', placeId, id:commentId });
+  });
 }
 
 function escapeHtml(str){ const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
@@ -1059,12 +1140,14 @@ async function submitComment(id){
   const text = textEl.value.trim();
   if(!text) return;
   const date = new Date().toISOString().slice(0,10);
-  const entry = {name:nameEl.value.trim(), text, date};
+  const commentId = Date.now()+'-'+Math.random().toString(36).slice(2,7);
+  const entry = {id:commentId, name:nameEl.value.trim(), text, date};
   placeState[id].comments = placeState[id].comments || [];
   placeState[id].comments.push(entry);
-  renderComments(placeState[id].comments);
+  renderComments(id, placeState[id].comments);
   textEl.value=''; nameEl.value='';
-  await apiPost({ action:'comment', placeId:id, name:entry.name, text:entry.text, date });
+  saveOwnedComment(commentId);
+  await apiPost({ action:'comment', placeId:id, name:entry.name, text:entry.text, date, id:commentId });
   bumpParticipation();
 }
 
