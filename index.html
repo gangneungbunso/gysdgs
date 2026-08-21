@@ -411,9 +411,19 @@
       <div class="team-line">
         <span class="chip">🏫 강릉 강일여자고등학교 2학년</span>
         <span class="chip">👥 이상한 에코크리에이터 2기</span>
-        <span class="chip">📅 총 4회 활동 진행 중</span>
       </div>
     </section>
+
+    <div class="posts-block" id="homePostsBlock" style="margin-top:0;">
+      <div class="posts-head">
+        <div>
+          <h2>📰 우리가 취재한 강릉 이야기</h2>
+          <p>이상한 에코크리에이터 팀원들이 직접 취재하고 만든 최신 콘텐츠예요.</p>
+        </div>
+        <button class="btn btn-ghost btn-small" data-goto="wiki">전체 보러가기 →</button>
+      </div>
+      <div class="posts-grid" id="homePostsGrid"><div class="loading-note">불러오는 중…</div></div>
+    </div>
 
     <div class="howto-block">
       <h2 class="howto-title">🧭 이렇게 둘러보세요</h2>
@@ -625,14 +635,6 @@
       <h2>환경 이슈 백과</h2>
       <p>강릉에서 마주할 수 있는 20가지 환경 이슈를 정리했어요. 카드를 눌러 자세한 설명과 강릉과의 연결고리를 확인해보세요.</p>
     </div>
-    <div class="view-toggle-row" id="wikiModeToggle">
-      <button data-mode="category" class="active">🗂️ 이슈 유형으로 보기</button>
-      <button data-mode="place">📍 강릉 장소로 보기</button>
-    </div>
-    <div class="filter-row" id="filterRow"></div>
-    <div class="filter-row" id="placeFilterRow" style="display:none;"></div>
-    <p id="placeContextNote" style="display:none; font-size:13.5px; color:var(--ink-soft); margin:-8px 0 16px;"></p>
-    <div class="issue-grid" id="issueGrid"></div>
 
     <div class="posts-block">
       <div class="posts-head">
@@ -658,6 +660,19 @@
       </div>
       <div class="comment-list" id="requestList"><div class="loading-note">불러오는 중…</div></div>
     </div>
+
+    <div class="section-head" style="padding-top:44px;">
+      <span class="eyebrow">🗂️ 이슈 살펴보기</span>
+      <h2>환경 이슈 백과</h2>
+    </div>
+    <div class="view-toggle-row" id="wikiModeToggle">
+      <button data-mode="category" class="active">🗂️ 이슈 유형으로 보기</button>
+      <button data-mode="place">📍 강릉 장소로 보기</button>
+    </div>
+    <div class="filter-row" id="filterRow"></div>
+    <div class="filter-row" id="placeFilterRow" style="display:none;"></div>
+    <p id="placeContextNote" style="display:none; font-size:13.5px; color:var(--ink-soft); margin:-8px 0 16px;"></p>
+    <div class="issue-grid" id="issueGrid"></div>
   </section>
 
   <!-- ============ CHALLENGE ============ -->
@@ -1308,9 +1323,32 @@ function renderMediaEmbed(mediaValue){
 function renderPosts(){
   if(!cachedPosts.length){
     postsGrid.innerHTML = `<div class="posts-empty">아직 등록된 글이 없어요. 강릉 환경 지킴이 인터뷰나 취재 이야기를 첫 글로 남겨보세요! ✍️</div>`;
+  } else {
+    postsGrid.innerHTML = cachedPosts.slice().reverse().map(post=>`
+      <button class="post-card" data-id="${post.id}">
+        ${postCardThumb(post)}
+        <span class="post-tag">${escapeHtml(post.tag)}</span>
+        <h4>${escapeHtml(post.title)}</h4>
+        <p>${escapeHtml(post.content)}</p>
+        <div class="post-meta"><span>${escapeHtml(post.author||'익명')}</span><span>${post.date}</span></div>
+      </button>
+    `).join('');
+    postsGrid.querySelectorAll('.post-card').forEach(card=>{
+      card.addEventListener('click', ()=>openPostModal(card.dataset.id));
+    });
+  }
+  renderHomePosts();
+}
+
+function renderHomePosts(){
+  const grid = document.getElementById('homePostsGrid');
+  if(!grid) return;
+  if(!cachedPosts.length){
+    grid.innerHTML = `<div class="posts-empty">아직 등록된 글이 없어요. 곧 새로운 이야기가 올라올 예정이에요!</div>`;
     return;
   }
-  postsGrid.innerHTML = cachedPosts.slice().reverse().map(post=>`
+  const latest = cachedPosts.slice().reverse().slice(0,3);
+  grid.innerHTML = latest.map(post=>`
     <button class="post-card" data-id="${post.id}">
       ${postCardThumb(post)}
       <span class="post-tag">${escapeHtml(post.tag)}</span>
@@ -1319,8 +1357,11 @@ function renderPosts(){
       <div class="post-meta"><span>${escapeHtml(post.author||'익명')}</span><span>${post.date}</span></div>
     </button>
   `).join('');
-  postsGrid.querySelectorAll('.post-card').forEach(card=>{
-    card.addEventListener('click', ()=>openPostModal(card.dataset.id));
+  grid.querySelectorAll('.post-card').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      goto('wiki');
+      setTimeout(()=>openPostModal(card.dataset.id), 250);
+    });
   });
 }
 
