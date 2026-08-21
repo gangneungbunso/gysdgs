@@ -1144,9 +1144,9 @@ async function submitComment(id){
   const entry = {id:commentId, name:nameEl.value.trim(), text, date};
   placeState[id].comments = placeState[id].comments || [];
   placeState[id].comments.push(entry);
+  saveOwnedComment(commentId);
   renderComments(id, placeState[id].comments);
   textEl.value=''; nameEl.value='';
-  saveOwnedComment(commentId);
   await apiPost({ action:'comment', placeId:id, name:entry.name, text:entry.text, date, id:commentId });
   bumpParticipation();
 }
