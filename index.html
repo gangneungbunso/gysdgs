@@ -635,6 +635,14 @@
       <h2>환경 이슈 백과</h2>
       <p>강릉에서 마주할 수 있는 20가지 환경 이슈를 정리했어요. 카드를 눌러 자세한 설명과 강릉과의 연결고리를 확인해보세요.</p>
     </div>
+    <div class="view-toggle-row" id="wikiModeToggle">
+      <button data-mode="category" class="active">🗂️ 이슈 유형으로 보기</button>
+      <button data-mode="place">📍 강릉 장소로 보기</button>
+    </div>
+    <div class="filter-row" id="filterRow"></div>
+    <div class="filter-row" id="placeFilterRow" style="display:none;"></div>
+    <p id="placeContextNote" style="display:none; font-size:13.5px; color:var(--ink-soft); margin:-8px 0 16px;"></p>
+    <div class="issue-grid" id="issueGrid"></div>
 
     <div class="posts-block">
       <div class="posts-head">
@@ -660,19 +668,6 @@
       </div>
       <div class="comment-list" id="requestList"><div class="loading-note">불러오는 중…</div></div>
     </div>
-
-    <div class="section-head" style="padding-top:44px;">
-      <span class="eyebrow">🗂️ 이슈 살펴보기</span>
-      <h2>환경 이슈 백과</h2>
-    </div>
-    <div class="view-toggle-row" id="wikiModeToggle">
-      <button data-mode="category" class="active">🗂️ 이슈 유형으로 보기</button>
-      <button data-mode="place">📍 강릉 장소로 보기</button>
-    </div>
-    <div class="filter-row" id="filterRow"></div>
-    <div class="filter-row" id="placeFilterRow" style="display:none;"></div>
-    <p id="placeContextNote" style="display:none; font-size:13.5px; color:var(--ink-soft); margin:-8px 0 16px;"></p>
-    <div class="issue-grid" id="issueGrid"></div>
   </section>
 
   <!-- ============ CHALLENGE ============ -->
