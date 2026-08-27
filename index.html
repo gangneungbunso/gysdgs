@@ -1553,6 +1553,18 @@ changePassBtn.addEventListener('click', (e)=>{ e.preventDefault(); changeTeamPas
 let cachedRequests = [];
 const requestList = document.getElementById('requestList');
 
+function getOwnedRequests(){
+  try{ return JSON.parse(localStorage.getItem('myRequests') || '[]'); }catch(e){ return []; }
+}
+function saveOwnedRequest(id){
+  try{
+    const owned = getOwnedRequests();
+    owned.push(id);
+    localStorage.setItem('myRequests', JSON.stringify(owned));
+  }catch(e){}
+}
+function isOwnedRequest(id){ return getOwnedRequests().includes(id); }
+
 async function loadRequests(){
   cachedRequests = APP_DATA.requests;
   renderRequests();
@@ -1562,26 +1574,94 @@ function renderRequests(){
     requestList.innerHTML = `<div class="comment-empty">아직 요청이 없어요. 궁금한 걸 남겨보세요!</div>`;
     return;
   }
-  requestList.innerHTML = cachedRequests.slice().reverse().map(r=>`
+  requestList.innerHTML = cachedRequests.slice().reverse().map(r=>{
+    const canModerate = !!r.id;
+    const owner = canModerate && isOwnedRequest(r.id);
+    return `
     <div class="comment-item">
       <div class="who"><span>${escapeHtml(r.name || '궁금한 방문자')}</span><time>${r.date}</time></div>
       <p>${escapeHtml(r.content)}</p>
-    </div>
-  `).join('');
+      ${canModerate ? `
+      <div class="c-actions">
+        ${owner
+          ? `<button class="c-act-btn" data-act="edit" data-rid="${r.id}">✏️ 수정</button><button class="c-act-btn" data-act="delete-own" data-rid="${r.id}">🗑️ 삭제</button>`
+          : `<button class="c-act-btn c-admin" data-act="delete-admin" data-rid="${r.id}">🔒 신고/삭제</button>`}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  requestList.querySelectorAll('.c-act-btn').forEach(btn=>{
+    const rid = btn.dataset.rid;
+    if(btn.dataset.act === 'edit'){
+      btn.addEventListener('click', ()=>startEditRequest(rid));
+    } else if(btn.dataset.act === 'delete-own'){
+      btn.addEventListener('click', ()=>confirmDeleteRequest(rid));
+    } else {
+      btn.addEventListener('click', ()=>requireTeamAccess(()=>confirmDeleteRequest(rid)));
+    }
+  });
 }
+
+function startEditRequest(id){
+  const req = cachedRequests.find(r=>r.id===id);
+  if(!req) return;
+  modalCard.innerHTML = `
+    <button class="modal-close" id="modalCloseBtn">✕</button>
+    <span class="ic-big">✏️</span>
+    <h3>요청 수정하기</h3>
+    <textarea id="editRequestText" maxlength="200" style="min-height:90px;">${escapeHtml(req.content)}</textarea>
+    <div class="submit-row"><button class="btn btn-primary btn-small" id="editRequestSubmit">저장</button></div>
+  `;
+  modalBackdrop.classList.add('show');
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  document.getElementById('editRequestSubmit').addEventListener('click', async ()=>{
+    const newText = document.getElementById('editRequestText').value.trim();
+    if(!newText) return;
+    req.content = newText;
+    renderRequests();
+    closeModal();
+    await apiPost({ action:'editRequest', id, content:newText });
+  });
+}
+
+function confirmDeleteRequest(id){
+  modalCard.innerHTML = `
+    <button class="modal-close" id="modalCloseBtn">✕</button>
+    <span class="ic-big">🗑️</span>
+    <h3>이 요청을 삭제할까요?</h3>
+    <p>삭제하면 되돌릴 수 없어요.</p>
+    <div class="submit-row" style="gap:8px;">
+      <button class="btn btn-ghost btn-small" id="rDelCancel">취소</button>
+      <button class="btn btn-primary btn-small" id="rDelConfirm" style="background:var(--coral);">삭제하기</button>
+    </div>
+  `;
+  modalBackdrop.classList.add('show');
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  document.getElementById('rDelCancel').addEventListener('click', closeModal);
+  document.getElementById('rDelConfirm').addEventListener('click', async ()=>{
+    cachedRequests = cachedRequests.filter(r=>r.id!==id);
+    APP_DATA.requests = cachedRequests;
+    renderRequests();
+    closeModal();
+    await apiPost({ action:'deleteRequest', id });
+  });
+}
+
 document.getElementById('reqSubmit').addEventListener('click', async ()=>{
   const nameEl = document.getElementById('reqName');
   const contentEl = document.getElementById('reqContent');
   const content = contentEl.value.trim();
   if(!content) return;
   const date = new Date().toISOString().slice(0,10);
-  const entry = {name:nameEl.value.trim(), content, date};
+  const reqId = Date.now()+'-'+Math.random().toString(36).slice(2,7);
+  const entry = {id:reqId, name:nameEl.value.trim(), content, date};
   cachedRequests.push(entry);
   APP_DATA.requests = cachedRequests;
+  saveOwnedRequest(reqId);
   renderRequests();
   nameEl.value=''; contentEl.value='';
   bumpParticipation();
-  await apiPost({ action:'addRequest', name:entry.name, content:entry.content, date });
+  await apiPost({ action:'addRequest', id:reqId, name:entry.name, content:entry.content, date });
 });
 
 /* ============================================================ CHALLENGE QUIZ ============================================================ */
