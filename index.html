@@ -209,9 +209,9 @@
   @media (max-width:900px){.issue-grid{grid-template-columns:repeat(2,1fr);}}
   @media (max-width:520px){.issue-grid{grid-template-columns:1fr;}}
 
-  .modal-backdrop{position:fixed; inset:0; background:rgba(20,32,29,0.5); display:none; align-items:center; justify-content:center; z-index:100; padding:20px; overflow-y:auto;}
+  .modal-backdrop{position:fixed; inset:0; background:rgba(20,32,29,0.5); display:none; align-items:flex-start; justify-content:center; z-index:100; padding:40px 20px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
   .modal-backdrop.show{display:flex;}
-  .modal-card{background:var(--paper); border-radius:22px; max-width:520px; width:100%; padding:30px; position:relative; box-shadow:0 30px 60px rgba(0,0,0,0.25); animation:popup .3s ease; margin:auto;}
+  .modal-card{background:var(--paper); border-radius:22px; max-width:520px; width:100%; padding:30px; position:relative; box-shadow:0 30px 60px rgba(0,0,0,0.25); animation:popup .3s ease; margin:auto; max-height:85vh; overflow-y:auto; -webkit-overflow-scrolling:touch;}
   @keyframes popup{from{opacity:0; transform:scale(.94);} to{opacity:1; transform:scale(1);}}
   .modal-close{position:absolute; top:16px; right:18px; border:none; background:var(--sand); width:30px; height:30px; border-radius:50%; font-size:15px;}
   .modal-card .ic-big{font-size:38px;}
