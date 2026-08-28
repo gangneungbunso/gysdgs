@@ -1503,6 +1503,7 @@ function openPostForm(existing){
     <textarea id="postMedia" placeholder="이미지 URL 또는 유튜브 링크를 한 줄에 하나씩 붙여넣어보세요&#10;예)&#10;https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg" style="min-height:70px;">${isEdit?escapeHtml(mediaList(existing.media).join('\n')):''}</textarea>
     <p style="font-size:11.5px; color:var(--ink-soft); margin-top:6px; line-height:1.6;">파일 업로드는 지원하지 않아요. 구글 포토·네이버 블로그·유튜브 등에 먼저 올린 뒤, 그 링크를 붙여넣어주세요. 카드뉴스처럼 사진이 여러 장이면 한 줄에 하나씩 붙여넣으면 갤러리로 보여요.</p>
     <p id="postFormError" style="display:none; color:var(--coral); font-size:12.5px; margin-top:4px;">제목과 내용은 꼭 입력해주세요.</p>
+    <p id="postNetError" style="display:none; color:var(--coral); font-size:12.5px; margin-top:4px;">⚠️ 저장에 실패했어요. 인터넷 연결이나 광고 차단 확장 프로그램을 확인하고 다시 시도해주세요.</p>
     <div class="submit-row"><button class="btn btn-primary btn-small" id="postSubmitBtn">${isEdit ? '수정 완료' : '등록하기'}</button></div>
   `;
   modalBackdrop.classList.add('show');
@@ -1517,18 +1518,32 @@ async function submitPost(editId){
   const content = document.getElementById('postContent').value.trim();
   const media = document.getElementById('postMedia').value.split('\n').map(s=>s.trim()).filter(Boolean);
   const errEl = document.getElementById('postFormError');
+  const netErrEl = document.getElementById('postNetError');
   if(!title || !content){
     if(errEl) errEl.style.display = 'block';
     return;
   }
+  const btn = document.getElementById('postSubmitBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '저장 중…'; }
+
+  let result;
+  if(editId){
+    result = await apiPost({ action:'editPost', id: editId, title, author, tag, content, media });
+  } else {
+    const post = {id:Date.now()+'-'+Math.random().toString(36).slice(2,7), title, author, tag, content, media, date:new Date().toISOString().slice(0,10)};
+    result = await apiPost({ action:'addPost', id:post.id, title, author, tag, content, media, date:post.date });
+    if(result && result.ok !== false) cachedPosts.push(post);
+  }
+
+  if(!result || result.ok === false || result.error){
+    if(btn){ btn.disabled = false; btn.textContent = editId ? '수정 완료' : '등록하기'; }
+    if(netErrEl) netErrEl.style.display = 'block';
+    return;
+  }
+
   if(editId){
     const idx = cachedPosts.findIndex(p=>String(p.id)===String(editId));
     if(idx>-1) cachedPosts[idx] = {...cachedPosts[idx], title, author, tag, content, media};
-    await apiPost({ action:'editPost', id: editId, title, author, tag, content, media });
-  } else {
-    const post = {id:Date.now()+'-'+Math.random().toString(36).slice(2,7), title, author, tag, content, media, date:new Date().toISOString().slice(0,10)};
-    cachedPosts.push(post);
-    await apiPost({ action:'addPost', id:post.id, title, author, tag, content, media, date:post.date });
   }
   APP_DATA.posts = cachedPosts;
   renderPosts();
