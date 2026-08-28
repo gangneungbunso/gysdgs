@@ -1249,7 +1249,7 @@ function openIssueModal(id){
   document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
 }
 function closeModal(){ modalBackdrop.classList.remove('show'); }
-modalBackdrop.addEventListener('click', e=>{ if(e.target===modalBackdrop) closeModal(); });
+// Backdrop click-to-close intentionally disabled to prevent accidental closure while editing long forms.
 
 buildFilters();
 buildPlaceFilters();
