@@ -1362,7 +1362,6 @@ function youtubeId(url){
   const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{6,})/);
   return m ? m[1] : null;
 }
-function isImageUrl(url){ return /\.(jpe?g|png|gif|webp|avif)(\?.*)?$/i.test(url||''); }
 function isVideoFileUrl(url){ return /\.(mp4|webm|mov)(\?.*)?$/i.test(url||''); }
 function mediaList(media){
   if(!media) return [];
@@ -1370,14 +1369,29 @@ function mediaList(media){
   return [media];
 }
 
+// If an <img> fails to load, either hide it (thumbnails) or swap to a fallback link (full display).
+document.addEventListener('error', function(e){
+  const img = e.target;
+  if(!img || img.tagName !== 'IMG') return;
+  if(img.classList.contains('post-thumb')){
+    img.style.display = 'none';
+  } else if(img.dataset.fallbackUrl){
+    const url = img.dataset.fallbackUrl;
+    const wrapper = img.parentElement;
+    if(wrapper){
+      wrapper.outerHTML = `<div class="pd-linkrow" style="margin:14px 0;"><a href="${url}" target="_blank" rel="noopener">🔗 첨부 링크 열기 ↗</a></div>`;
+    }
+  }
+}, true);
+
 function postCardThumb(post){
   const list = mediaList(post.media);
   if(!list.length) return '';
   const first = list[0];
   const yid = youtubeId(first);
   if(yid) return `<img class="post-thumb" src="https://img.youtube.com/vi/${yid}/mqdefault.jpg" alt="">`;
-  if(isImageUrl(first)) return `<img class="post-thumb" src="${first}" alt="" loading="lazy">`;
-  return '';
+  if(isVideoFileUrl(first)) return '';
+  return `<img class="post-thumb" src="${escapeHtml(first)}" alt="" loading="lazy">`;
 }
 
 function renderSingleMedia(url){
@@ -1386,9 +1400,8 @@ function renderSingleMedia(url){
       <img src="https://img.youtube.com/vi/${yid}/hqdefault.jpg" alt="유튜브 영상 썸네일" loading="lazy">
       <span class="yt-play">▶</span>
     </a>`;
-  if(isImageUrl(url)) return `<div class="post-media"><img src="${url}" alt="" loading="lazy"></div>`;
-  if(isVideoFileUrl(url)) return `<div class="post-media"><video src="${url}" controls></video></div>`;
-  return `<div class="pd-linkrow" style="margin-top:12px;"><a href="${url}" target="_blank" rel="noopener">🔗 첨부 링크 열기 ↗</a></div>`;
+  if(isVideoFileUrl(url)) return `<div class="post-media"><video src="${escapeHtml(url)}" controls></video></div>`;
+  return `<div class="post-media"><img src="${escapeHtml(url)}" alt="" loading="lazy" data-fallback-url="${escapeHtml(url)}"></div>`;
 }
 
 function renderMediaEmbed(mediaValue){
