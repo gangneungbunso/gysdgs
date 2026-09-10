@@ -235,6 +235,7 @@
   .post-card{background:var(--paper); border-radius:16px; box-shadow:var(--shadow); padding:20px; cursor:pointer; transition:transform .2s; text-align:left; border-left:4px solid var(--sunset); overflow:hidden;}
   .post-card:hover{transform:translateY(-4px);}
   .post-thumb{display:block; width:calc(100% + 40px); height:130px; object-fit:cover; margin:-20px -20px 14px; border-radius:0;}
+  .ig-thumb{display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700; background:linear-gradient(135deg,#405DE6,#5B51D8,#833AB4,#C13584,#E1306C,#FD1D1D,#F56040,#F77737,#FCAF45,#FFDC80);}
   .post-tag{display:inline-block; font-size:11px; font-weight:700; background:var(--sand); color:var(--pine-dark); padding:4px 10px; border-radius:999px; margin-bottom:10px;}
   .post-card h4{margin:0 0 8px; font-size:15px; color:var(--pine-dark); line-height:1.4;}
   .post-card p{margin:0 0 10px; font-size:12.5px; color:var(--ink-soft); line-height:1.6; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
@@ -1447,7 +1448,8 @@ function postCardThumb(post){
   const first = list[0];
   const yid = youtubeId(first);
   if(yid) return `<img class="post-thumb" src="https://img.youtube.com/vi/${yid}/mqdefault.jpg" alt="">`;
-  if(isVideoFileUrl(first) || instagramId(first)) return '';
+  if(instagramId(first)) return `<div class="post-thumb ig-thumb">📷 Instagram 게시글</div>`;
+  if(isVideoFileUrl(first)) return '';
   return `<img class="post-thumb" src="${escapeHtml(first)}" alt="" loading="lazy">`;
 }
 
