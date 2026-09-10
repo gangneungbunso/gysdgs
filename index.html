@@ -77,7 +77,7 @@
   .sparkle{animation:twinkle 2.2s ease-in-out infinite; transform-box:fill-box; transform-origin:center;}
   @keyframes twinkle{0%,100%{opacity:.35; transform:scale(0.85);} 50%{opacity:1; transform:scale(1.05);}}
 
-  .stats-row{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:36px 0 46px;}
+  .stats-row{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:36px 0 46px;}
   .stat-card{background:var(--paper); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); border-bottom:4px solid var(--sunset);}
   .stat-card b{display:block; font-size:26px; font-family:'Gowun Batang',serif; color:var(--pine-dark);}
   .stat-card span{font-size:13px; color:var(--ink-soft);}
@@ -460,6 +460,7 @@
       <div class="stat-card"><b>15</b><span>강릉 속 환경 이야기가 담긴 장소</span></div>
       <div class="stat-card"><b>16</b><span>강릉에서 살펴본 환경 이슈</span></div>
       <div class="stat-card"><b id="homeParticipation">0</b><span>지금까지 함께한 실천 기록</span></div>
+      <div class="stat-card"><b id="homeVisitCount">0</b><span>누적 방문 수</span></div>
     </div>
 
     <!-- ===== 강릉 지도 섹션 (홈에 바로 노출) ===== -->
@@ -859,7 +860,8 @@ async function apiLoad(){
       challenges: Object.assign({ocean:0,cafe:0,water:0,life:0}, data.challenges || {}),
       posts: data.posts || [],
       requests: data.requests || [],
-      hasPasscode: !!data.hasPasscode
+      hasPasscode: !!data.hasPasscode,
+      visitCount: data.visitCount || 0
     };
   }catch(e){
     console.error('데이터를 불러오지 못했어요', e);
@@ -965,6 +967,21 @@ async function loadAllPlaces(){
   renderRanking();
   loadPosts();
   loadRequests();
+  updateVisitCount();
+  logVisit();
+}
+
+function updateVisitCount(){
+  const el = document.getElementById('homeVisitCount');
+  if(el) el.textContent = APP_DATA.visitCount || 0;
+}
+
+async function logVisit(){
+  const result = await apiPost({ action:'logVisit', date:new Date().toISOString().slice(0,10) });
+  if(result && result.ok && typeof result.visitCount === 'number'){
+    APP_DATA.visitCount = result.visitCount;
+    updateVisitCount();
+  }
 }
 
 function renderRanking(){
@@ -1376,10 +1393,37 @@ function youtubeId(url){
   return m ? m[1] : null;
 }
 function isVideoFileUrl(url){ return /\.(mp4|webm|mov)(\?.*)?$/i.test(url||''); }
+function instagramId(url){
+  if(!url) return null;
+  const m = url.match(/instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
 function mediaList(media){
   if(!media) return [];
   if(Array.isArray(media)) return media.filter(Boolean);
   return [media];
+}
+
+let igEmbedScriptLoaded = false;
+function loadInstagramEmbedScript(){
+  return new Promise((resolve)=>{
+    if(window.instgrm){ resolve(); return; }
+    if(igEmbedScriptLoaded){
+      const check = setInterval(()=>{ if(window.instgrm){ clearInterval(check); resolve(); } }, 200);
+      return;
+    }
+    igEmbedScriptLoaded = true;
+    const script = document.createElement('script');
+    script.src = 'https://www.instagram.com/embed.js';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => resolve();
+    document.body.appendChild(script);
+  });
+}
+async function processInstagramEmbeds(){
+  await loadInstagramEmbedScript();
+  if(window.instgrm && window.instgrm.Embeds) window.instgrm.Embeds.process();
 }
 
 // If an <img> fails to load, either hide it (thumbnails) or swap to a fallback link (full display).
@@ -1403,7 +1447,7 @@ function postCardThumb(post){
   const first = list[0];
   const yid = youtubeId(first);
   if(yid) return `<img class="post-thumb" src="https://img.youtube.com/vi/${yid}/mqdefault.jpg" alt="">`;
-  if(isVideoFileUrl(first)) return '';
+  if(isVideoFileUrl(first) || instagramId(first)) return '';
   return `<img class="post-thumb" src="${escapeHtml(first)}" alt="" loading="lazy">`;
 }
 
@@ -1413,6 +1457,9 @@ function renderSingleMedia(url){
       <img src="https://img.youtube.com/vi/${yid}/hqdefault.jpg" alt="유튜브 영상 썸네일" loading="lazy">
       <span class="yt-play">▶</span>
     </a>`;
+  if(instagramId(url)){
+    return `<blockquote class="instagram-media" data-instgrm-permalink="${escapeHtml(url)}" data-instgrm-version="14" style="background:#FFF; border:0; border-radius:12px; margin:0 auto; max-width:540px; width:100%; min-width:280px; padding:0;"></blockquote>`;
+  }
   if(isVideoFileUrl(url)) return `<div class="post-media"><video src="${escapeHtml(url)}" controls></video></div>`;
   return `<a class="post-media" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="누르면 원본 크기로 열려요"><img src="${escapeHtml(url)}" alt="" loading="lazy" data-fallback-url="${escapeHtml(url)}"></a>`;
 }
@@ -1487,6 +1534,7 @@ function openPostModal(id, unlocked){
   `;
   modalBackdrop.classList.add('show');
   document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  if(mediaList(post.media).some(instagramId)) processInstagramEmbeds();
   if(unlocked){
     document.getElementById('postEditBtn').addEventListener('click', ()=>openPostForm(post));
     document.getElementById('postDeleteBtn').addEventListener('click', ()=>deletePost(post.id));
@@ -1514,7 +1562,7 @@ function openPostForm(existing){
     <textarea id="postContent" placeholder="취재하거나 만든 내용을 자유롭게 적어주세요">${isEdit?escapeHtml(existing.content):''}</textarea>
     <label>사진/영상 링크 (선택, 여러 장은 줄바꿈으로 구분)</label>
     <textarea id="postMedia" placeholder="이미지 URL 또는 유튜브 링크를 한 줄에 하나씩 붙여넣어보세요&#10;예)&#10;https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg" style="min-height:70px;">${isEdit?escapeHtml(mediaList(existing.media).join('\n')):''}</textarea>
-    <p style="font-size:11.5px; color:var(--ink-soft); margin-top:6px; line-height:1.6;">파일 업로드는 지원하지 않아요. 구글 포토·네이버 블로그·유튜브 등에 먼저 올린 뒤, 그 링크를 붙여넣어주세요. 카드뉴스처럼 사진이 여러 장이면 한 줄에 하나씩 붙여넣으면 갤러리로 보여요.</p>
+    <p style="font-size:11.5px; color:var(--ink-soft); margin-top:6px; line-height:1.6;">파일 업로드는 지원하지 않아요. 이미지 링크(i.imgur.com 등)·유튜브·인스타그램 게시글 링크를 붙여넣어주세요. 카드뉴스처럼 사진이 여러 장이면 한 줄에 하나씩 붙여넣으면 갤러리로 보여요.</p>
     <p id="postFormError" style="display:none; color:var(--coral); font-size:12.5px; margin-top:4px;">제목과 내용은 꼭 입력해주세요.</p>
     <p id="postNetError" style="display:none; color:var(--coral); font-size:12.5px; margin-top:4px;">⚠️ 저장에 실패했어요. 인터넷 연결이나 광고 차단 확장 프로그램을 확인하고 다시 시도해주세요.</p>
     <div class="submit-row"><button class="btn btn-primary btn-small" id="postSubmitBtn">${isEdit ? '수정 완료' : '등록하기'}</button></div>
